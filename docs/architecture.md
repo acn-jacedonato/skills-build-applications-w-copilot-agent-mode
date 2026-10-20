@@ -28,22 +28,22 @@ OctoFit Tracker is a three-tier application for a school fitness program. The st
 
 ## Implementation decisions
 
-Record your plan here before editing code.
+Implement in dependency order: data contracts first, API behavior next, and presentation wiring last. Keep each tier responsible for its own concerns and preserve the existing ports, relative `/api` calls, and unauthenticated exercise setup.
 
-- Presentation tier decision:
-- Logic tier decision:
-- Data tier decision:
-- Activity tracking approach:
-- Team management approach:
-- Leaderboard approach:
-- Workout suggestions approach:
+- Presentation tier decision: Keep React components focused on rendering and user interaction; use the shared API client for relative `/api` requests. Each capability should expose accessible loading, empty, and error states, and should not duplicate API business logic.
+- Logic tier decision: Implement the contracts in the existing Express routes/services. Validate request data and references at the API boundary, return deliberate 4xx responses for invalid or unknown resources, and leave persistence to the data tier.
+- Data tier decision: Add the required fields, validation, and defaults to the existing Mongoose models. Preserve seed idempotency and unrelated records; do not add a second persistence mechanism.
+- Activity tracking approach: List activities and create them only after validating the submitted user and team IDs and confirming both references exist. Persist the corresponding user, team, type, and minutes, along with computed points and an occurrence date; malformed or missing references must not become cast-error 500s.
+- Team management approach: List and create teams through the API, preserving the submitted name and mascot and exposing members. Reject a missing name with `400`; keep member relationships consistent with the existing Mongoose models.
+- Leaderboard approach: Calculate each team's total from its activity points, sort highest total first, and return `teamName`, `totalPoints`, and a 1-based rank for every entry.
+- Workout suggestions approach: Find the requested user by email, use the user's goal and recent activities to choose the first suitable workout, and include a reason tied to that context. Return a deliberate 4xx when no user matches.
 
 ## Test plan
 
-Record the commands you run and what each failure means.
+Run tests in tier order. The contract tests currently expose the starter's incomplete implementation; the results below record the baseline run and what each failure indicates. Build commands are included as follow-up checks and have not yet been run.
 
-- Data-tier command: `npm run test:data --prefix octofit-tracker/backend`
-- API command: `npm run test:api --prefix octofit-tracker/backend`
-- Frontend command: `npm test --prefix octofit-tracker/frontend`
-- Backend build command: `npm run build --prefix octofit-tracker/backend`
-- Frontend build command: `npm run build --prefix octofit-tracker/frontend`
+- Data tier — `npm run test:data --prefix octofit-tracker/backend`: **4 failed, 1 passed.** The failures indicate required user, team, activity, and workout model validation is incomplete. The seed/idempotency contract passes and should remain passing.
+- API — `npm run test:api --prefix octofit-tracker/backend`: **4 failed.** Invalid activity and nameless team requests return `501` instead of `400`; the leaderboard is empty instead of totaling and ranking activity points; the first workout suggestion does not match the user's goal/activity.
+- Presentation — `npm test --prefix octofit-tracker/frontend`: **15 failed.** Capability data is not rendered as expected, the user-specific workout request is missing or incorrect, and loading, empty, and API-error accessible states fail across the four routes.
+- Backend build — `npm run build --prefix octofit-tracker/backend`: **Not run.** Run after implementation to catch TypeScript errors.
+- Frontend build — `npm run build --prefix octofit-tracker/frontend`: **Not run.** Run after implementation to catch TypeScript and Vite build errors.
